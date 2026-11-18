@@ -135,7 +135,6 @@ button{font-family:var(--font)}
   <div class="hud-row">
     <div class="tape" id="lvlTag">第1关 · 樱花小路</div>
     <div class="stats">
-      <span class="chip" id="pwChip" hidden></span>
       <span class="chip" id="hearts">❤️❤️❤️</span>
       <span class="chip">🐟 <b id="fishN">0</b></span>
       <button id="mute" aria-label="开关声音">🔊</button>
@@ -168,32 +167,12 @@ const LEVELS = [
   {name:'星空回家路', len:5400, speed:165, types:['puddle','snail','yarn','cucumber'], gap:[430,590], avoid:'前面遇到过的都会出现',
    tip:'最后一关啦，宇宇就在路的尽头等你。', note:''},
 ];
-const FEATS = [
-  {spring:0, plat:0, pw:['magnet'], news:'🌿 猫薄荷：吃到后小鱼会自己飞过来'},
-  {spring:1, plat:0, pw:['magnet','shield'], news:'🍄 蘑菇蹦床：跑上去会弹得超高<br>🫧 爱心泡泡：能帮你挡一次'},
-  {spring:1, plat:1, pw:['shield','magnet'], news:'🍪 饼干台子：跳上去可以在上面走'},
-  {spring:1, plat:2, pw:['magnet','shield'], news:'更多云朵台子和蘑菇蹦床'},
-  {spring:2, plat:1, pw:['shield','magnet'], news:'前面所有好玩的东西都在这里'},
-];
-const LOVE = [
-  ['第一次见你，就觉得你好特别','你笑起来的时候，我的世界就亮了','想把所有可爱的东西都送给你'],
-  ['下雨天，想和你窝在一起','牵着你的手，阴天也是晴天','你是我每天最想见的人'],
-  ['你是我吃过最甜的糖','想和你把每家甜品店都吃一遍','今天也偷偷多喜欢了你一点'],
-  ['每天睡前，最想听到你的声音','做梦都会梦到你','晚安，我的小鱼'],
-  ['谢谢你出现在我的生命里','想和你一起看很多很多次星星','以后的每一天，都想和你一起过'],
-];
-const SPRING = 700;
 const OBS_NAME = {puddle:'水坑', wide:'大水坑', snail:'小蜗牛', yarn:'毛线球', cucumber:'小黄瓜'};
 const FIRST_TIP = {
   snail:'小蜗牛爬过来啦 🐌<br>点一下跳过去～',
   yarn:'毛线球滚过来啦 🧶<br>看准了，跳！',
   cucumber:'是小黄瓜 🥒<br>小猫最怕它了，快跳过去',
-  wide:'前面的水坑有点宽 💧<br>跳起来后，在空中再点一下更稳',
-  spring:'前面是蘑菇蹦床 🍄<br>跑上去就会弹得超高！',
-  plat:'空中有台子 🍪<br>跳上去可以在上面走',
-  magnet:'前面有猫薄荷 🌿<br>吃到后小鱼会自己飞过来',
-  shield:'前面有爱心泡泡 🫧<br>吃到能帮你挡一次碰撞',
-  gold:'金色的是情话鱼 💌<br>吃到会有一句悄悄话'
+  wide:'前面的水坑有点宽 💧<br>跳起来后，在空中再点一下更稳'
 };
 const DOG_LINES = ['小鱼加油！','我在前面等你哦','今天也很想你','慢慢来，我一直都在','你认真的样子好可爱','跑累了就想想我嘛','有我在，什么都不用怕','再往前一点点就见到我啦'];
 const THEMES = [
@@ -221,8 +200,7 @@ const G = {
   state:'title', lvl:0, t:0, animT:0, camX:0, ts:1,
   cat:{x:0,h:0,vy:0,ground:true,jumps:0}, lives:3, maxLives:3, inv:0, shake:0,
   obs:[], fish:[], dew:null, levelEaten:0, levelDew:false,
-  done:[0,0,0,0,0], dews:[false,false,false,false,false], loves:[0,0,0,0,0],
-  plats:[], springs:[], pws:[], magnet:0, shield:false, combo:0, rainDone:false, rainT:0, levelLove:0,
+  done:[0,0,0,0,0], dews:[false,false,false,false,false],
   tut:{mode:null, jumpDone:false, dewDone:false, praise:false, fishTip:false},
   tipShown:{}, bubbleT:6, nearWarned:false, parts:[], floats:[], amb:[], shoot:null,
   meetT:0, letterShown:false, easy:false
@@ -239,7 +217,7 @@ function makeObs(type, x0, speed){
   return o;
 }
 function buildLevel(i){
-  const L = LEVELS[i], F = FEATS[i], r = rng(4242 + i*977), obs = [];
+  const L = LEVELS[i], r = rng(4242 + i*977), obs = [];
   let x = i===0 ? 640 : 520; const end = L.len - 420;
   while(x < end){
     const type = L.types[Math.floor(r()*L.types.length)];
@@ -247,19 +225,13 @@ function buildLevel(i){
     x += L.gap[0] + r()*(L.gap[1]-L.gap[0]);
   }
   if(i===4){ const k = Math.floor(obs.length*0.55); obs[k] = makeObs('wide', obs[k].x0, L.speed); }
-  const gaps = [];
-  for(let k=0;k<obs.length-1;k++) gaps.push({a:obs[k].meet, b:obs[k+1].meet, used:false});
-  let dewX = L.len*0.5, bd = 1e9, dg = null;
+  let dewX = L.len*0.5, bd = 1e9;
   const target = L.len*(i===0 ? 0.42 : 0.55);
-  for(const g of gaps){ if(g.b - g.a < 380) continue; const m = (g.a + g.b)/2, dd = Math.abs(m - target); if(dd < bd){ bd = dd; dewX = m; dg = g; } }
-  if(dg) dg.used = true;
-  const r2 = rng(99 + i*31);
-  const take = minW => { const c = gaps.filter(g => !g.used && g.b - g.a >= minW && g.a > 700); if(!c.length) return null; const g = c[Math.floor(r2()*c.length)]; g.used = true; return g; };
-  const springs = [], plats = [], pws = [];
-  for(let n=0;n<F.spring;n++){ const g = take(470); if(g) springs.push({x:g.a + 120, sq:0, seen:false}); }
-  for(let n=0;n<F.plat;n++){ const g = take(500); if(g) plats.push({x0:g.a + 170, x1:g.a + 330, h:72, seen:false}); }
-  for(const type of F.pw){ const g = take(400); if(g) pws.push({x:(g.a + g.b)/2, h:30, type, got:false, seen:false}); }
-  const fish = [], f0 = 260, f1 = L.len - 160, goldIdx = [26, 55, 84];
+  for(let k=0;k<obs.length-1;k++){
+    const a = obs[k].meet, b = obs[k+1].meet; if(b-a < 380) continue;
+    const m = (a+b)/2, d = Math.abs(m-target); if(d < bd){bd = d; dewX = m;}
+  }
+  const fish = [], f0 = 260, f1 = L.len - 160;
   for(let n=0;n<FISH_PER;n++){
     const fx = f0 + (f1-f0)*n/(FISH_PER-1);
     let lift = 0;
@@ -268,14 +240,9 @@ function buildLevel(i){
       const d = Math.abs(fx - o.meet);
       if(d < Hs) lift = Math.max(lift, top*(1+Math.cos(Math.PI*d/Hs))/2);
     }
-    for(const sp of springs){ const tt = (fx - sp.x)/L.speed; if(tt > 0){ const hh = SPRING*tt - GRAV/2*tt*tt; if(hh > 0) lift = Math.max(lift, hh); } }
-    for(const p of plats){
-      if(fx >= p.x0 - 10 && fx <= p.x1) lift = Math.max(lift, p.h);
-      else if(fx > p.x0 - 90 && fx < p.x0 - 10) lift = Math.max(lift, p.h + 14*Math.sin(Math.PI*(fx - (p.x0 - 90))/80));
-    }
-    fish.push({x:fx, h:20+lift, got:false, gold:goldIdx.includes(n), c:['#FF9A62','#FF8FA8','#7FC8F0'][n%3]});
+    fish.push({x:fx, h:20+lift, got:false, c:['#FF9A62','#FF8FA8','#7FC8F0'][n%3]});
   }
-  return {obs, fish, dew:{x:dewX, h:165, got:false}, springs, plats, pws};
+  return {obs, fish, dew:{x:dewX, h:165, got:false}};
 }
 
 /* ---------- audio ---------- */
@@ -296,8 +263,6 @@ const sfx = {
   fish(){beep(1180,.08,'triangle',.05); setTimeout(()=>beep(1560,.08,'triangle',.04),55);},
   dew(){[880,1100,1320,1760].forEach((f,i)=>setTimeout(()=>beep(f,.14,'triangle',.05),i*70));},
   hurt(){beep(300,.25,'square',.04,150);},
-  boing(){beep(200,.32,'sine',.08,700);},
-  shield(){beep(760,.22,'triangle',.06,320);},
   win(){[660,784,988,1318].forEach((f,i)=>setTimeout(()=>beep(f,.2,'triangle',.06),i*110));}
 };
 $('mute').addEventListener('click', e => { muted = !muted; e.currentTarget.textContent = muted ? '🔇' : '🔊'; });
@@ -325,8 +290,6 @@ function updateHUD(){
   const p = Math.max(0, Math.min(1, G.cat.x / L.len));
   $('progFill').style.width = (p*100) + '%';
   $('progCat').style.left = (p*100) + '%';
-  const pw = (G.shield ? '🫧' : '') + (G.magnet > 0 ? ` 🌿${Math.ceil(G.magnet)}s` : '');
-  if(hudCache.pw !== pw){ hudCache.pw = pw; $('pwChip').textContent = pw.trim(); $('pwChip').hidden = !pw; }
 }
 function totalFish(){ return G.done.reduce((a,b)=>a+b,0); }
 
@@ -353,9 +316,8 @@ function showHowto(){
 }
 function startLevel(i, easy){
   G.lvl = i; G.easy = easy;
-  const b = buildLevel(i); G.obs = b.obs; G.fish = b.fish; G.dew = b.dew; G.springs = b.springs; G.plats = b.plats; G.pws = b.pws;
-  G.magnet = 0; G.shield = false; G.combo = 0; G.rainDone = false; G.rainT = 0; G.levelLove = 0;
-  G.cat = {x:0, h:0, vy:0, ground:true, jumps:0, plat:null};
+  const b = buildLevel(i); G.obs = b.obs; G.fish = b.fish; G.dew = b.dew;
+  G.cat = {x:0, h:0, vy:0, ground:true, jumps:0};
   G.maxLives = easy ? 5 : 3; G.lives = G.maxLives; G.inv = 0; G.ts = 1;
   G.levelEaten = 0; G.levelDew = false; G.bubbleT = i===0 ? 14 : 5; G.nearWarned = false;
   G.camX = -VW*CAT_SX; G.amb = []; G.parts = []; G.floats = [];
@@ -366,8 +328,7 @@ function startLevel(i, easy){
     <div class="rows">
       <div><span class="lbl">要躲开</span>${L.avoid}</div>
       <div><span class="lbl">要做的</span>${i===4 ? '跑到宇宇身边 🐶' : '一路吃小鱼，跑到终点的 ❤️ 旗子'}</div>
-      <div><span class="lbl">新玩意</span>${FEATS[i].news}</div>
-      <div><span class="lbl">彩蛋</span>3 条金色 💌情话鱼，高处还有 1 颗 ✨露珠</div>
+      <div><span class="lbl">彩蛋</span>高处藏着一颗 ✨露珠，拿不到也没关系</div>
     </div>
     <p class="tip">💡 ${L.tip}</p>
     ${easy ? '<p>宇宇多送你两颗心，这次有 <b>5 颗 ❤️</b></p>' : ''}
@@ -381,12 +342,12 @@ function startLevel(i, easy){
 }
 function levelClear(){
   G.state = 'clear'; G.ts = 0; $('hint').hidden = true; hideCoach();
-  G.done[G.lvl] = G.levelEaten; G.dews[G.lvl] = G.levelDew; G.loves[G.lvl] = G.levelLove;
+  G.done[G.lvl] = G.levelEaten; G.dews[G.lvl] = G.levelDew;
   sfx.win(); confetti(40);
   const L = LEVELS[G.lvl];
   showCard(`<div class="eyebrow">第 ${G.lvl+1} 关 通关！</div>
     <p class="note">${L.note}</p>
-    <div class="statline"><span>🐟 ${G.levelEaten} 条</span><span>💌 ${G.levelLove} / 3</span><span>✨ ${G.levelDew ? '露珠拿到啦' : '露珠没拿到'}</span></div>
+    <div class="statline"><span>🐟 ${G.levelEaten} / ${FISH_PER}</span><span>✨ 露珠 ${G.levelDew ? '拿到啦' : '这次没拿到'}</span></div>
     <button class="btn" id="bNext">下一关 ▶</button>
     <div class="stamp">通关<small>小鱼专属</small></div>`);
   on('bNext', () => startLevel(G.lvl + 1, false));
@@ -403,7 +364,7 @@ function levelFail(){
 /* ---------- input ---------- */
 function jump(){
   const c = G.cat;
-  if(c.ground){ c.vy = J1; c.ground = false; c.jumps = 1; c.plat = null; sfx.jump(); puff(); }
+  if(c.ground){ c.vy = J1; c.ground = false; c.jumps = 1; sfx.jump(); puff(); }
   else if(c.jumps < 2){ c.vy = J2; c.jumps = 2; sfx.jump2(); sparkle(VW*CAT_SX, GY - c.h - 10, 8, '#FFFFFF'); }
 }
 function tap(){
@@ -429,101 +390,56 @@ addEventListener('keydown', e => {
 /* ---------- effects ---------- */
 function puff(){ for(let i=0;i<6;i++) G.parts.push({x:VW*CAT_SX + (Math.random()-.5)*16, y:GY-2, vx:(Math.random()-.5)*60, vy:-Math.random()*40, life:.4, max:.4, kind:'dot', col:'rgba(255,255,255,.9)', s:3+Math.random()*3, g:0}); }
 function sparkle(x, y, n, col){ for(let i=0;i<n;i++){ const a = Math.random()*Math.PI*2, v = 60+Math.random()*120; G.parts.push({x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:.6, max:.6, kind:'star', col, s:3+Math.random()*3, g:120}); } }
-function floatText(x, y, text, col, big){ G.floats.push({x, y, text, col, life:big ? 1.4 : 1, max:1, big}); }
+function floatText(x, y, text, col){ G.floats.push({x, y, text, col, life:1, max:1}); }
 function confetti(n){ const cols = ['#FF9EB8','#E8668C','#FFE59A','#A8E6D2','#FFFFFF','#FF9A62']; for(let i=0;i<n;i++) G.parts.push({x:Math.random()*VW, y:-10 - Math.random()*80, vx:(Math.random()-.5)*60, vy:60+Math.random()*80, life:3, max:3, kind:Math.random()<.4?'heart':'rect', col:cols[i%cols.length], s:5+Math.random()*4, g:40, rot:Math.random()*6}); }
 function firework(x, y){ const cols = ['#FF9EB8','#E8668C','#FFE59A','#A8E6D2','#FF9A62']; const n = 16; for(let i=0;i<n;i++){ const a = i/n*Math.PI*2, v = 90+Math.random()*60; G.parts.push({x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:1.4, max:1.4, kind:i%3===0?'fish':'heart', col:cols[i%cols.length], s:6+Math.random()*3, g:60, rot:a}); } beep(500+Math.random()*400,.3,'triangle',.03,1400); }
 
 /* ---------- update ---------- */
 function hurt(o){
   const c = G.cat;
-  G.lives--; G.inv = 1.6; o.hit = true; G.shake = .3; G.combo = 0;
-  c.vy = 240; c.ground = false; c.jumps = 1; c.plat = null; sfx.hurt();
+  G.lives--; G.inv = 1.6; o.hit = true; G.shake = .3;
+  c.vy = 240; c.ground = false; c.jumps = 1; sfx.hurt();
   if(G.lives <= 0){ levelFail(); return; }
   showToast(`哎呀，碰到${OBS_NAME[o.type]}了～<br>还有 ${G.lives} 颗心，没关系！`, 2000);
 }
-function onLand(){
-  if(G.tut.mode==='dew2'){ G.tut.mode = null; G.tut.dewDone = true; G.ts = 1; hideCoach(); if(!G.levelDew) showToast('差一点点～没关系<br>后面每一关都还有露珠', 2400); }
-  if(G.tut.praise){ G.tut.praise = false; showToast('跳得真好！就是这样 ✨<br>看到障碍就点一下', 2400); }
-}
-function eatFish(f){
-  f.got = true; G.levelEaten++; G.combo++; sfx.fish();
-  const dark = THEMES[G.lvl].dark, fx = f.x - G.camX, fy = GY - f.h;
-  sparkle(fx, fy, 5, '#FFE59A'); floatText(fx, fy - 10, '+1', dark ? '#FFE59A' : ROSE);
-  if(G.combo % 10 === 0) floatText(VW*CAT_SX + 6, GY - G.cat.h - 84, `连击 ×${G.combo}！`, dark ? '#FFFFFF' : '#FF6F91', true);
-  if(f.gold){
-    const line = LOVE[G.lvl][G.levelLove % 3]; G.levelLove++;
-    sfx.dew(); sparkle(fx, fy, 16, '#FFD54A');
-    showToast(`💌 情话鱼 ${G.levelLove}/3<br>${line}`, 3000);
-  } else if(!G.tut.fishTip){ G.tut.fishTip = true; if(!G.tut.mode) showToast('吃到小鱼啦 🐟<br>一路上的小鱼都可以吃哦', 2200); }
-}
-function tipOnce(key){ if(!G.tipShown[key] && FIRST_TIP[key]){ G.tipShown[key] = true; showToast(FIRST_TIP[key], 2600); } }
 function updatePlay(dt){
   const L = LEVELS[G.lvl], c = G.cat, d = dt*G.ts;
   G.animT += d;
   c.x += L.speed*d;
-  if(c.plat && c.x > c.plat.x1 + 8){ c.plat = null; c.ground = false; c.vy = 0; c.jumps = 1; }
   if(!c.ground){
-    const prevH = c.h;
     c.vy -= GRAV*d; c.h += c.vy*d;
-    if(c.vy <= 0){
-      for(const p of G.plats){
-        if(c.x > p.x0 - 8 && c.x < p.x1 + 8 && prevH >= p.h - .5 && c.h <= p.h){ c.h = p.h; c.vy = 0; c.ground = true; c.jumps = 0; c.plat = p; onLand(); break; }
-      }
+    if(c.h <= 0){ c.h = 0; c.vy = 0; c.ground = true; c.jumps = 0;
+      if(G.tut.mode==='dew2'){ G.tut.mode = null; G.tut.dewDone = true; G.ts = 1; hideCoach(); if(!G.levelDew) showToast('差一点点～没关系<br>后面每一关都还有露珠', 2400); }
+      if(G.tut.praise){ G.tut.praise = false; showToast('跳得真好！就是这样 ✨<br>看到障碍就点一下', 2400); }
     }
-    if(!c.ground && c.h <= 0){ c.h = 0; c.vy = 0; c.ground = true; c.jumps = 0; onLand(); }
   }
   if(G.inv > 0) G.inv -= d;
-  if(G.magnet > 0) G.magnet -= d;
-  const ahead = VW*0.62;
-  for(const sp of G.springs){
-    if(sp.sq > 0) sp.sq -= d*3;
-    if(!sp.seen && sp.x - c.x < ahead){ sp.seen = true; tipOnce('spring'); }
-    if(c.ground && !c.plat && Math.abs(c.x - sp.x) < 16){ c.vy = SPRING; c.ground = false; c.jumps = 1; sp.sq = 1; sfx.boing(); sparkle(sp.x - G.camX, GY - 18, 10, '#FFFFFF'); }
-  }
-  for(const p of G.plats) if(!p.seen && p.x0 - c.x < ahead){ p.seen = true; tipOnce('plat'); }
-  for(const p of G.pws) if(!p.seen && p.x - c.x < ahead){ p.seen = true; tipOnce(p.type); }
+  const sx = VW*CAT_SX;
   for(const o of G.obs){
     if(o.v && !o.active && o.x - c.x < ACT) o.active = true;
     if(o.active){ o.x -= o.v*d; o.rot += o.v*d/15; }
-    if(!o.seen && o.x - c.x < ahead){ o.seen = true; tipOnce(o.type); }
+    if(!o.seen && o.x - c.x < VW*0.62){
+      o.seen = true;
+      if(FIRST_TIP[o.type] && !G.tipShown[o.type]){ G.tipShown[o.type] = true; showToast(FIRST_TIP[o.type], 2600); }
+    }
   }
-  if(G.inv <= 0){
+  if(G.inv <= 0 && G.state==='play'){
     for(const o of G.obs){
       if(o.hit) continue;
       let hit = false;
       if(o.type==='puddle' || o.type==='wide') hit = c.h < 5 && Math.abs(c.x - o.x) < o.half;
       else hit = (c.x + 13 > o.x - o.w/2 + 3) && (c.x - 13 < o.x + o.w/2 - 3) && (c.h + 4 < o.hh - 2);
-      if(hit){
-        if(G.shield){ G.shield = false; o.hit = true; G.inv = 1; sfx.shield(); sparkle(VW*CAT_SX, GY - c.h - 28, 16, '#FFB3C7'); showToast('爱心泡泡帮你挡住啦 🫧', 1800); }
-        else { hurt(o); if(G.state !== 'play') return; }
-        break;
-      }
+      if(hit){ hurt(o); if(G.state!=='play') return; break; }
     }
   }
-  if(!G.rainDone && !G.tut.mode && c.x > L.len*0.68){ G.rainDone = true; G.rainT = 4; showToast('🐟 小鱼雨来啦！<br>跑过去就能接住', 2200); }
-  if(G.rainT > 0){
-    G.rainT -= d;
-    if(Math.random() < d*7){ const h0 = GY + 10; G.fish.push({x:c.x + 120 + Math.random()*260, h:h0, vh:-(h0 - 20)/(0.8 + Math.random()*0.4), rain:true, landT:0, got:false, c:['#FF9A62','#FF8FA8','#7FC8F0'][Math.floor(Math.random()*3)]}); }
-  }
-  const cy = c.h + 20;
+  const cy = c.h + 18;
   for(const f of G.fish){
-    if(f.got || f.gone) continue;
-    if(f.gold && !f.seen && f.x - c.x < ahead){ f.seen = true; tipOnce('gold'); }
-    if(f.rain){ if(f.h > 20){ f.h = Math.max(20, f.h + f.vh*d); } else { f.landT += d; if(f.landT > 1.8){ f.gone = true; continue; } } }
-    if(G.magnet > 0 && !f.fly && f.x - c.x < 170 && f.x - c.x > -30) f.fly = true;
-    if(f.fly){
-      const dx = c.x - f.x, dy = cy - f.h, dist = Math.hypot(dx, dy), step = (520 + L.speed)*d;
-      if(dist <= step + 12){ eatFish(f); continue; }
-      f.x += dx/dist*step; f.h += dy/dist*step; continue;
-    }
-    if(Math.abs(f.x - c.x) < (f.rain ? 26 : 22) && (f.rain ? f.h < cy + 60 && f.h > cy - 40 : Math.abs(f.h - cy) < 28)) eatFish(f);
-  }
-  for(const p of G.pws){
-    if(p.got) continue;
-    if(Math.abs(p.x - c.x) < 24 && Math.abs(p.h - cy) < 32){
-      p.got = true; sfx.dew(); sparkle(p.x - G.camX, GY - p.h, 14, '#FFFFFF');
-      if(p.type==='magnet'){ G.magnet = 6; showToast('🌿 猫薄荷！<br>小鱼都会飞过来啦', 1800); }
-      else { G.shield = true; showToast('🫧 爱心泡泡！<br>能帮你挡一次', 1800); }
+    if(f.got) continue;
+    if(Math.abs(f.x - c.x) < 22 && Math.abs(f.h - cy) < 26){
+      f.got = true; G.levelEaten++; sfx.fish();
+      const fx = f.x - G.camX, fy = GY - f.h;
+      sparkle(fx, fy, 5, '#FFE59A'); floatText(fx, fy - 10, '+1', THEMES[G.lvl].dark ? '#FFE59A' : ROSE);
+      if(!G.tut.fishTip){ G.tut.fishTip = true; if(!G.tut.mode) showToast('吃到小鱼啦 🐟<br>一路上的小鱼都可以吃哦', 2200); }
     }
   }
   const dw = G.dew;
@@ -556,7 +472,7 @@ function updatePlay(dt){
 function startMeet(){
   G.state = 'meet'; G.meetT = 0; G.letterShown = false; G.ts = 1;
   $('hint').hidden = true; hideToast(); $('bubble').hidden = true;
-  G.done[4] = G.levelEaten; G.dews[4] = G.levelDew; G.loves[4] = G.levelLove;
+  G.done[4] = G.levelEaten; G.dews[4] = G.levelDew;
 }
 function updateMeet(dt){
   const c = G.cat, dogX = LEVELS[4].len + 60;
@@ -633,15 +549,16 @@ function showQuestion(){
 function showFinal(){
   G.state = 'final'; G.fwT = 0;
   for(let k=0;k<4;k++) setTimeout(()=>firework(VW*(0.2+Math.random()*0.6), GY*(0.2+Math.random()*0.35)), k*250);
-  const fish = totalFish(), allDew = G.dews.every(Boolean), dewN = G.dews.filter(Boolean).length, loveN = G.loves.reduce((a,b)=>a+b,0);
+  const fish = totalFish(), allDew = G.dews.every(Boolean), dewN = G.dews.filter(Boolean).length;
   showCard(`<div class="eyebrow">约定好啦</div>
     <div class="names">谢翔宇 ♥ 郑歆愉</div>
     <p>你一共收集了 <b>${fish}</b> 条小鱼，<br>可我只想要你这一条。</p>
-    ${allDew ? `<div class="secret"><small>集齐 5 颗露珠的隐藏便签</small>你喜欢露思，我喜欢你 ✨</div>` : ''}
-    <p style="font-size:15px">💌 情话鱼 ${loveN} / 15　✨ 露珠 ${dewN} / 5${allDew ? '' : '<br>集齐 5 颗露珠会有一张隐藏便签哦'}</p>
+    ${allDew
+      ? `<div class="secret"><small>集齐 5 颗露珠的隐藏便签</small>你喜欢露思，我喜欢你 ✨</div>`
+      : `<p style="font-size:15px">✨ 露珠 ${dewN} / 5　集齐 5 颗会有一张隐藏便签哦</p>`}
     <button class="btn" id="bAgain">再玩一次</button>
     <div class="stamp">永远<small>小鱼专属</small></div>`);
-  on('bAgain', () => { G.done = [0,0,0,0,0]; G.dews = [false,false,false,false,false]; G.loves = [0,0,0,0,0]; G.arrived = false; startLevel(0, false); });
+  on('bAgain', () => { G.done = [0,0,0,0,0]; G.dews = [false,false,false,false,false]; G.arrived = false; startLevel(0, false); });
 }
 
 /* ---------- drawing helpers ---------- */
@@ -802,57 +719,6 @@ function drawObs(o, sx, t){
   }
   ctx.restore();
 }
-function drawSpring(sx, sq, th){
-  const k = Math.max(0, sq);
-  ctx.save(); ctx.translate(sx, GY); ctx.scale(1 + k*.25, 1 - k*.3);
-  ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.rect(-6, -15, 12, 15); ctx.fillStyle = '#FFF3E6'; ctx.fill(); ctx.stroke();
-  ctx.fillStyle = INK; circle(-2.5, -8, 1.3); ctx.fill(); circle(2.5, -8, 1.3); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(0, -15, 18, 13, 0, Math.PI, 0); ctx.closePath(); ctx.fillStyle = th===2 ? '#FF8FB1' : '#FF6F91'; ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#FFFFFF'; circle(-8, -20, 2.8); ctx.fill(); circle(2, -24, 2.3); ctx.fill(); circle(10, -18, 2); ctx.fill();
-  ctx.restore();
-}
-function drawPlat(a, b, h, th){
-  const y = GY - h, cols = ['#FFFFFF','#F1EDFA','#F2C98A','#9C8BD6','#6A5FB8'];
-  ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.fillStyle = cols[th];
-  if(th===2){
-    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(a, y, b - a, 16, 6) : ctx.rect(a, y, b - a, 16); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#C98F4E'; for(let x = a + 12; x < b - 6; x += 18){ circle(x, y + 8, 1.6); ctx.fill(); }
-  } else {
-    ctx.beginPath(); ctx.moveTo(a + 8, y + 16);
-    for(let x = a + 8; x < b - 8; x += 20){ ctx.arc(x + 10, y + 6, 11, Math.PI, 0); }
-    ctx.lineTo(b - 6, y + 16); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(a + 14, y + 2, (b - a)*.35, 3);
-  }
-  ctx.restore();
-}
-function drawPw(x, y, type, t){
-  const yy = y + Math.sin(t*3 + x)*4;
-  ctx.save();
-  const g = ctx.createRadialGradient(x, yy, 2, x, yy, 26); g.addColorStop(0, type==='magnet' ? 'rgba(170,240,190,.8)' : 'rgba(255,190,210,.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g; circle(x, yy, 26); ctx.fill();
-  circle(x, yy, 15); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.stroke();
-  if(type==='magnet'){
-    ctx.fillStyle = '#7CCB8A';
-    ctx.beginPath(); ctx.ellipse(x - 4, yy - 1, 4, 8, -.6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(x + 4, yy - 1, 4, 8, .6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x, yy + 3); ctx.lineTo(x, yy + 10); ctx.stroke();
-  } else {
-    ctx.fillStyle = '#FF7FA3'; heartPath(x, yy - 8, 16); ctx.fill(); ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(x - 7, yy - 8, 3, 1.8, -.7, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-}
-function drawGold(x, y, t){
-  ctx.save();
-  const g = ctx.createRadialGradient(x, y, 2, x, y, 26); g.addColorStop(0, 'rgba(255,220,100,.75)'); g.addColorStop(1, 'rgba(255,220,100,0)');
-  ctx.fillStyle = g; circle(x, y, 26); ctx.fill(); ctx.restore();
-  drawFish(x, y, 1.35, '#FFD54A');
-  ctx.save(); ctx.fillStyle = '#FF6F91'; heartPath(x + 1, y - 4, 7); ctx.fill();
-  ctx.translate(x + 14, y - 12); ctx.rotate(t*2); ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath(); for(let i=0;i<8;i++){ const r = i%2 ? 1.5 : 5, a = i*Math.PI/4; ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r); } ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
 function drawDew(sx, h, t){
   const y = GY - h + Math.sin(t*3)*3;
   ctx.save();
@@ -1009,8 +875,8 @@ function drawParts(){
     else if(p.kind==='fish'){ drawFish(p.x, p.y, .7, p.col, p.rot || 0); }
     ctx.restore();
   }
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for(const f of G.floats){ ctx.font = (f.big ? 24 : 18) + 'px "ZCOOL KuaiLe", sans-serif'; ctx.globalAlpha = Math.max(0, Math.min(1, f.life)); ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, f.y); }
+  ctx.font = '18px "ZCOOL KuaiLe", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for(const f of G.floats){ ctx.globalAlpha = Math.max(0, f.life); ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, f.y); }
   ctx.globalAlpha = 1;
 }
 
@@ -1025,17 +891,8 @@ function draw(){
   if(th < 4){ const fx = L.len - camX; if(inView(fx)) drawFlag(fx, t, T.dark); }
   else { const dx = L.len + 60 - camX; if(inView(dx)) drawDog(dx, GY, t, (G.arrived && (G.state==='meet' || G.state==='final')) ? Math.abs(Math.sin(t*5))*12 : 0); }
   if(G.state !== 'title'){
-    for(const p of G.plats){ const a = p.x0 - camX, b = p.x1 - camX; if(b > -40 && a < VW + 40) drawPlat(a, b, p.h, th); }
-    for(const sp of G.springs){ const sx = sp.x - camX; if(inView(sx)) drawSpring(sx, sp.sq, th); }
     if(G.dew && !G.dew.got){ const dx = G.dew.x - camX; if(inView(dx)) drawDew(dx, G.dew.h, t); }
-    for(const f of G.fish){
-      if(f.got || f.gone) continue; const fx = f.x - camX; if(!inView(fx)) continue;
-      const fy = GY - f.h + (f.fly || f.rain ? 0 : Math.sin(t*3 + f.x*.05)*2.5);
-      if(f.rain && f.landT > 1.2) ctx.globalAlpha = Math.max(0, (1.8 - f.landT)/0.6);
-      if(f.gold) drawGold(fx, fy, t); else drawFish(fx, fy, 1, f.c);
-      ctx.globalAlpha = 1;
-    }
-    for(const p of G.pws){ if(p.got) continue; const px = p.x - camX; if(inView(px)) drawPw(px, GY - p.h, p.type, t); }
+    for(const f of G.fish){ if(f.got) continue; const fx = f.x - camX; if(inView(fx)) drawFish(fx, GY - f.h + Math.sin(t*3 + f.x*.05)*2.5, 1, f.c); }
     for(const o of G.obs){ const ox = o.x - camX; if(inView(ox)) drawObs(o, ox, t); }
   }
   const c = G.cat;
@@ -1044,12 +901,6 @@ function draw(){
   const air = G.state!=='title' && !c.ground;
   const catT = G.state==='title' ? G.t : ((G.state==='meet' || G.state==='final') && G.arrived ? 0 : G.animT);
   drawCat(catSX, GY - (G.state==='title' ? 0 : c.h) - ((G.state==='final') ? Math.abs(Math.sin(t*5 + 1))*10 : 0), catT, air, alpha);
-  if(G.state==='play' || G.state==='intro'){
-    const cyS = GY - c.h - 30;
-    if(G.shield){ ctx.save(); circle(catSX + 1, cyS, 38); ctx.fillStyle = 'rgba(255,170,200,.18)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,111,145,.7)'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.ellipse(catSX - 16, cyS - 20, 6, 3, -.7, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
-    if(G.magnet > 0){ ctx.save(); ctx.translate(catSX + 1, cyS); ctx.rotate(t*2); ctx.setLineDash([6, 7]); ctx.strokeStyle = `rgba(110,200,130,${G.magnet < 1.5 ? .4 + .4*Math.sin(t*20) : .8})`; ctx.lineWidth = 2.5; circle(0, 0, 44); ctx.stroke(); ctx.restore(); }
-  }
   ctx.restore();
   drawAmbient();
   drawParts();
